@@ -1,0 +1,22 @@
+#!/bin/bash
+
+module='scull'
+device='scull'
+mode='644'
+
+group='staff'
+grep -q '^staff:' /etc/group || group='wheel'
+
+/sbin/insmod ./${module}.ko $* || exit 1
+
+# remove stale nodes
+rm -f /dev/${device}[0-3]
+
+major=$(awk -v m=$module '$2 == m {print $1}' /proc/devices)
+
+for i in {0..3}; do
+    mknod /dev/${device}${i} c $major $i
+done
+
+chgrp $group /dev/${device}[0-3]
+chmod $mode /dev/${device}[0-3]
