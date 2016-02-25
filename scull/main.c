@@ -12,11 +12,39 @@
 static int scull_major = SCULL_MAJOR;
 static int scull_minor = SCULL_MINOR;
 static int scull_nr_devs = SCULL_NR_DEVS;
+static int scull_qset = SCULL_QSET;
+static int scull_quantum = SCULL_QUANTUM;
 module_param(scull_major, int, S_IRUGO);
 module_param(scull_minor, int, S_IRUGO);
 module_param(scull_nr_devs, int, S_IRUGO);
+module_param(scull_qset, int, S_IRUGO);
+module_param(scull_quantum, int, S_IRUGO);
 
 static struct scull_dev *scull_devices;
+
+static void scull_trim(struct scull_dev *dev)
+{
+    int i, qset = dev->qset;
+    struct scull_qset *dptr, *next;
+
+    for (dptr = dev->data; dptr; dptr = next) {
+        if (dptr->data) {
+            for (i = 0; i < qset; i++) {
+                if (dptr->data[i]) {
+                    kfree(dptr->data[i]);
+                }
+            }
+            kfree(dptr->data);
+        }
+        next = dptr->next;
+        kfree(dptr);
+    }
+
+    dev->data = NULL;
+    dev->size = 0;
+    dev->qset = scull_qset;
+    dev->quantum = scull_quantum;
+}
 
 int scull_open(struct inode *inode, struct file *filp)
 {
@@ -105,6 +133,7 @@ static void __exit scull_exit(void)
 
     for (i = 0; i < scull_nr_devs; i++) {
         cdev_del(&scull_devices[i].cdev);
+        scull_trim(&scull_devices[i]);
     }
     kfree(scull_devices);
 
