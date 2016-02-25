@@ -48,7 +48,15 @@ static void scull_trim(struct scull_dev *dev)
 
 int scull_open(struct inode *inode, struct file *filp)
 {
+    struct scull_dev *dev;
+
     printk(KERN_INFO "scull open is called\n");
+    dev = container_of(inode->i_cdev, struct scull_dev, cdev);
+    filp->private_data = dev;
+
+    if ((filp->f_flags & O_ACCMODE) == O_WRONLY) {
+        scull_trim(dev);
+    }
     return 0;
 }
 
