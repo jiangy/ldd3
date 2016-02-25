@@ -2,6 +2,7 @@
 #define _SCULL_H
 
 #include <linux/cdev.h>
+#include <linux/semaphore.h>
 
 #define SCULL_MAJOR 0
 #define SCULL_MINOR 0
@@ -20,6 +21,7 @@ struct scull_dev {
     int qset;
     int quantum;
     unsigned long size;
+    struct semaphore sem;
     struct cdev cdev;
 };
 
