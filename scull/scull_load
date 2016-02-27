@@ -2,10 +2,9 @@
 
 module='scull'
 device='scull'
-mode='644'
+mode='664'
 
-group='staff'
-grep -q '^staff:' /etc/group || group='wheel'
+group=$(id -gn ${SUDO_USER:-$USER})
 
 /sbin/insmod ./${module}.ko $* || exit 1
 
