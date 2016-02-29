@@ -28,6 +28,10 @@ static void scull_trim(struct scull_dev *dev)
     int i, qset = dev->qset;
     struct scull_qset *dptr, *next;
 
+    if (printk_ratelimit()) {
+        PDEBUG("trim scull data\n");
+    }
+
     for (dptr = dev->data; dptr; dptr = next) {
         if (dptr->data) {
             for (i = 0; i < qset; i++) {
@@ -51,7 +55,8 @@ int scull_open(struct inode *inode, struct file *filp)
 {
     struct scull_dev *dev;
 
-    printk(KERN_INFO "scull open is called\n");
+    PDEBUG("file opened with flags:%x\n", filp->f_flags);
+
     dev = container_of(inode->i_cdev, struct scull_dev, cdev);
     filp->private_data = dev;
 
@@ -63,7 +68,7 @@ int scull_open(struct inode *inode, struct file *filp)
 
 int scull_release(struct inode *inode, struct file *filp)
 {
-    printk(KERN_INFO "scull release is called\n");
+    PDEBUG("release is called\n");
     return 0;
 }
 
@@ -103,7 +108,9 @@ ssize_t scull_read(struct file *filp, char __user *buf, size_t count, loff_t *f_
     int item, rest, s_pos, q_pos;
     ssize_t retval = 0;
 
-    printk(KERN_INFO "scull read is called, request size: %zu\n", count);
+    if (printk_ratelimit()) {
+        PDEBUG("read is called with request size: %zu\n", count);
+    }
     if (down_interruptible(&dev->sem)) {
         return -ERESTARTSYS;
     }
@@ -135,6 +142,10 @@ ssize_t scull_read(struct file *filp, char __user *buf, size_t count, loff_t *f_
     *f_pos += count;
     retval = count;
 
+    if (printk_ratelimit()) {
+        PDEBUG("read successly with size: %zu\n", count);
+    }
+
 out:
     up(&dev->sem);
     return retval;
@@ -149,7 +160,9 @@ ssize_t scull_write(struct file *filp, const char __user *buf, size_t count, lof
     int item, rest, s_pos, q_pos;
     ssize_t retval = -ENOMEM;
 
-    printk(KERN_INFO "scull write is called, request size: %zu\n", count);
+    if (printk_ratelimit()) {
+        PDEBUG("write is called with request size: %zu\n", count);
+    }
     if (down_interruptible(&dev->sem)) {
         return -ERESTARTSYS;
     }
@@ -188,6 +201,10 @@ ssize_t scull_write(struct file *filp, const char __user *buf, size_t count, lof
     dev->size = *f_pos + count > dev->size ? *f_pos + count : dev->size;
     *f_pos += count;
     retval = count;
+
+    if (printk_ratelimit()) {
+        PDEBUG("write successly with size: %zu\n", count);
+    }
 
 out:
     up(&dev->sem);
