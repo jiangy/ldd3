@@ -5,6 +5,8 @@
 #include <linux/types.h>
 #include <linux/kdev_t.h>
 #include <linux/fs.h>
+#include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 #include <linux/slab.h>
 #include <linux/uaccess.h>
 
@@ -219,6 +221,74 @@ struct file_operations scull_fops ={
     .write = scull_write,
 };
 
+#ifdef SCULL_DEBUG
+static void *scull_seq_start(struct seq_file *s, loff_t *pos)
+{
+    if (*pos >= scull_nr_devs) {
+        return NULL;
+    }
+    return scull_devices + *pos;
+}
+static void *scull_seq_next(struct seq_file *s, void *v, loff_t *pos)
+{
+    (*pos)++;
+    if (*pos >= scull_nr_devs) {
+        return NULL;
+    }
+    return scull_devices + *pos;
+}
+static void scull_seq_stop(struct seq_file *s, void *v)
+{
+    return;
+}
+static int scull_seq_show(struct seq_file *s, void *v)
+{
+    struct scull_dev *dev = (struct scull_dev *)v;
+    struct scull_qset *d;
+    int i;
+
+    if (down_interruptible(&dev->sem)) {
+        return -ERESTARTSYS;
+    }
+    seq_printf(s, "\nDevice %i: qset %i, q %i, sz %li\n",
+            (int)(dev - scull_devices), dev->qset,
+            dev->quantum, dev->size);
+    for (d = dev->data; d; d = d->next) {
+        seq_printf(s, "  item at %p, qset at %p\n", d, d->data);
+        if (d->data && d->next == NULL) {
+            for (i = 0; i < dev->qset; i++) {
+                if (d->data[i]) {
+                    seq_printf(s, "    % 4i: %8p\n", i, d->data[i]);
+                }
+            }
+        }
+    }
+    up(&dev->sem);
+    return 0;
+}
+
+static struct seq_operations scull_seq_ops = {
+    .start = scull_seq_start,
+    .next = scull_seq_next,
+    .stop = scull_seq_stop,
+    .show = scull_seq_show
+};
+
+static int scull_proc_open(struct inode *inode, struct file *filp)
+{
+    return seq_open(filp, &scull_seq_ops);
+}
+
+static struct file_operations scull_proc_ops = {
+    .owner = THIS_MODULE,
+    .open = scull_proc_open,
+    .read = seq_read,
+    .llseek = seq_lseek,
+    .release = seq_release
+};
+
+#endif /* SCULL_DEBUG */
+
 static void scull_setup_cdev(struct scull_dev *dev, int index)
 {
     int err, devno = MKDEV(scull_major, scull_minor + index);
@@ -263,6 +333,10 @@ static int __init scull_init(void)
         scull_devices[i].quantum = scull_quantum;
     }
 
+#ifdef SCULL_DEBUG
+    proc_create("scullseq", 0, NULL, &scull_proc_ops);
+#endif
+
     return 0;
 
 fail:
@@ -274,6 +348,10 @@ static void __exit scull_exit(void)
 {
     int i;
     dev_t dev = MKDEV(scull_major, scull_minor);
+
+#ifdef SCULL_DEBUG
+    remove_proc_entry("scullseq", NULL);
+#endif
 
     for (i = 0; i < scull_nr_devs; i++) {
         cdev_del(&scull_devices[i].cdev);
