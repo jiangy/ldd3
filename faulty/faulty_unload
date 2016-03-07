@@ -1,0 +1,10 @@
+#!/bin/bash
+
+module='faulty'
+device='faulty'
+
+# invoke rmmod with all arguments we got
+/sbin/rmmod $module $* || exit 1
+
+# remove stale nodes
+rm -f /dev/${device}
