@@ -1,0 +1,9 @@
+#!/bin/bash
+
+module=${1}
+device=${1}
+
+/sbin/rmmod $module || exit 1
+
+# remove stale nodes
+rm -f /dev/${device}
